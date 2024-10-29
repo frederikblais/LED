@@ -8,7 +8,7 @@ class LEDController:
         self.current_mode = 'off'
         self.is_powered = False
         # Pré-calcul des valeurs communes pour réduire les calculs en temps réel
-        self.loading_tail = [pow(x, 0.5) for x in np.linspace(1, 0, 12)]
+        self.loading_tail = [pow(x, 0.5) for x in np.linspace(1, 0, 8)]
         self.spin_tail = [pow(x, 0.5) for x in np.linspace(1, 0, 6)]
         
     @lru_cache(maxsize=128)
@@ -25,8 +25,8 @@ class LEDController:
         return colors
 
     def get_tracking_frame(self, brightness):
-        """Animation de suivi - pulsation uniforme"""
-        return [(brightness,) * 3] * self.num_leds
+        """Animation de suivi - stroboscope à 30Hz"""
+        return [(brightness, brightness, brightness)] * self.num_leds
 
     def get_error_frame(self, brightness):
         """Animation d'erreur - pulsation rouge"""
@@ -43,33 +43,43 @@ class LEDController:
         colors = list(self._get_black_array())
         
         if phase == 'fill':
-            # Remplissage progressif
             for i in range(step + 1):
                 colors[i] = (0, 0.2, 0.4)
         elif phase == 'pulse':
-            # Pulsation uniforme
             return [(0, 0.2 * step, 0.4 * step)] * self.num_leds
         elif phase == 'spin':
-            # Rotation finale
-            for t, brightness in enumerate(self.spin_tail):
+            # Use same tail length as loading animation
+            for t, brightness in enumerate(self.loading_tail):
                 idx = (step + t) % self.num_leds
                 colors[idx] = tuple(c * brightness for c in (0, 0.5, 1.0))
+        elif phase == 'success':
+            wave_width = 8
+            wave_position = step % self.num_leds
+            for i in range(self.num_leds):
+                distance = min((i - wave_position) % self.num_leds, 
+                             (wave_position - i) % self.num_leds)
+                if distance < wave_width:
+                    brightness = 1 - (distance / wave_width)
+                    colors[i] = (0, brightness, 0)
+        elif phase == 'final':
+            return [(1.0, 1.0, 1.0)] * self.num_leds
+        
         return colors
 
     def get_shutdown_sequence_frame(self, phase, step):
-        """Séquence d'arrêt avec effets de transition"""
-        if phase == 'pulse':
-            # Pulsation rapide
-            return [(step,) * 3] * self.num_leds
-        elif phase == 'wipe':
-            # Effacement progressif
-            colors = list(self._get_black_array())
-            for i in range(step):
-                colors[i] = (1, 1, 1)
-            return colors
-        else:  # fade
-            # Fondu final
-            return [(0.1 * step,) * 2 + (0.2 * step,)] * self.num_leds
+        """Séquence d'arrêt améliorée"""
+        colors = list(self._get_black_array())
+        
+        if phase == 'spin':
+            # Red spinner with tail
+            for t, brightness in enumerate(self.loading_tail):
+                idx = (step + t) % self.num_leds
+                colors[idx] = (brightness, 0, 0)  # Red spinner
+        elif phase == 'fade':
+            # Final fade to black
+            return [(step * 0.3, 0, 0)] * self.num_leds  # Dim red fade
+        
+        return colors
 
     def set_mode(self, mode):
         """Change le mode d'animation actuel"""

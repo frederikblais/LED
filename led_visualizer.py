@@ -3,32 +3,50 @@ import matplotlib.pyplot as plt
 from led_controller import LEDController
 
 class LEDVisualizer:
+    """
+    Visualiseur graphique pour simuler un anneau de LEDs.
+    
+    Cette classe fournit une interface graphique interactive permettant de:
+    - Simuler différentes animations sur un anneau de LEDs
+    - Contrôler les animations via le clavier
+    - Afficher les états du système (démarrage, arrêt, etc.)
+    
+    Attributs:
+        controller (LEDController): Gestionnaire des états et couleurs des LEDs
+        fig (Figure): Fenêtre matplotlib principale
+        ax (Axes): Système de coordonnées polaires pour l'anneau
+        scatter (PathCollection): Collection de points représentant les LEDs
+    """
+
     def __init__(self, num_leds=24):
-        """Initialisation du visualiseur avec configuration de l'interface graphique"""
+        """
+        Initialise le visualiseur avec une configuration spécifique.
+        
+        Args:
+            num_leds (int): Nombre de LEDs dans l'anneau (défaut: 24)
+        """
         self.controller = LEDController(num_leds)
         
-        # Configuration de base de matplotlib
+        # Configuration de base de matplotlib pour un thème sombre
         plt.style.use('dark_background')
         self.fig = plt.figure(figsize=(8, 10))
-        plt.rcParams['toolbar'] = 'None'
+        plt.rcParams['toolbar'] = 'None'  # Cache la barre d'outils
         
-        # Configuration du graphique polaire
+        # Création du graphique en coordonnées polaires pour simuler l'anneau
         self.ax = self.fig.add_subplot(111, projection='polar')
         angles = np.linspace(0, 2*np.pi, num_leds, endpoint=False)
         radius = [1] * num_leds
         self.scatter = self.ax.scatter(angles, radius, c=[(0,0,0)]*num_leds, s=300)
         
-        # Nettoyage de l'interface
         self._clean_display()
-        
-        # Configuration plein écran
         self._setup_fullscreen()
         
+        # Configuration des événements clavier
         self.fig.canvas.mpl_connect('key_press_event', self.on_key_press)
-        plt.ion()
+        plt.ion()  # Active le mode interactif
 
     def _clean_display(self):
-        """Nettoie l'affichage des éléments non nécessaires"""
+        """Nettoie l'interface en supprimant les éléments graphiques non nécessaires"""
         self.ax.set_rticks([])
         self.ax.set_xticks([])
         self.ax.set_yticks([])
@@ -72,14 +90,38 @@ class LEDVisualizer:
             self.shutdown_sequence()
 
     def _handle_mode_change(self, key):
-        """Gère le changement de mode d'animation"""
+        """
+        Gère le changement de mode d'animation.
+        
+        Args:
+            key (str): Touche pressée ('left' ou 'right')
+            
+        Les modes disponibles sont:
+        - loading: Animation de chargement rotative
+        - tracking: Clignotement alterné
+        - error: Pulsation rouge
+        - success: Pulsation verte
+        """
         modes = ['loading', 'tracking', 'error', 'success']
         current_idx = modes.index(self.controller.current_mode) if self.controller.current_mode in modes else 0
         new_idx = (current_idx + (1 if key == 'right' else -1)) % len(modes)
         self.controller.set_mode(modes[new_idx])
 
     def run(self):
-        """Boucle principale d'animation"""
+        """
+        Lance la boucle principale d'animation.
+        
+        Gère:
+        - L'affichage des différentes animations
+        - La mise à jour des états du système
+        - La gestion des erreurs potentielles
+        
+        Contrôles:
+        - Flèches gauche/droite: Changer d'animation
+        - 'b': Démarrer le système
+        - 'v': Arrêter le système
+        - 'ESC': Quitter le programme
+        """
         print("Starting LED Visualizer...\nControls:\n← → : Change animation\nb   : Boot sequence\nv   : Shutdown sequence\nESC : Exit program")
         self.clear_display()
         
@@ -134,7 +176,16 @@ class LEDVisualizer:
             plt.close('all')
 
     def boot_sequence(self):
-        """Séquence de démarrage avec animations progressives"""
+        """
+        Exécute la séquence de démarrage du système.
+        
+        Phases:
+        1. Remplissage progressif des LEDs
+        2. Double pulsation de l'anneau complet
+        3. Rotation finale avant le mode normal
+        
+        En cas d'erreur, le système s'éteint automatiquement.
+        """
         self.clear_display()
         plt.title('Démarrage du système...', color='white', pad=20, y=1.05)
         
@@ -174,7 +225,16 @@ class LEDVisualizer:
             self.clear_display()
 
     def shutdown_sequence(self):
-        """Séquence d'arrêt avec effets de transition"""
+        """
+        Exécute la séquence d'arrêt du système.
+        
+        Phases:
+        1. Pulsation rapide (3 fois)
+        2. Effacement progressif des LEDs
+        3. Fondu final vers l'extinction
+        
+        En cas d'erreur, force l'arrêt du système.
+        """
         plt.title('Arrêt du système...', color='white', pad=20, y=1.05)
         
         try:
